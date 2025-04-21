@@ -1,206 +1,151 @@
-# Car Rental System 🚗
+# Car Rental System with Terraform
 
-This project offers a modern car rental platform. It is a professional web application developed using the Flask framework and deployed with Nginx and Gunicorn.
+---
 
-## 🌟 Features
+### **Project Description**
+This project automates the deployment of a car rental system's infrastructure on AWS using Terraform. It provisions and configures all necessary resources, including application servers, a database, a load balancer, and DNS records, to host and run the application seamlessly.
 
-### 👥 User Operations
-- User registration and login
-- Profile editing
-- Password reset
-- Email verification
+---
 
-### 🚙 Vehicle Operations
-- Vehicle listing and detailed search
-- Filtering by brand, model, year, and price
-- Viewing vehicle details
-- Vehicle rental and reservation
+### **Provisioned Resources**
 
-### 📊 Admin Panel
-- Viewing statistics
-  - Total number of vehicles
-  - Number of users
-  - Number of rentals
-  - Total revenue
-- Vehicle management
-- User management
-- Rental tracking
+#### **1. Security Groups**
+- **ALB Security Group (`aws_security_group.alb-sg`)**:
+  - Allows inbound HTTP (port 80) traffic from the internet.
+  - Allows all outbound traffic.
 
-## 🛠️ Technologies
+- **EC2 Security Group (`aws_security_group.ec2-sg`)**:
+  - Allows inbound HTTP (port 80) traffic from the ALB.
+  - Allows inbound SSH (port 22) traffic from anywhere (for debugging purposes).
+  - Allows all outbound traffic.
 
-- **Backend:** Python Flask
-- **Frontend:** HTML, CSS, JavaScript
-- **Database:** MySQL
-- **Web Server:** Nginx
-- **WSGI Server:** Gunicorn
-- **Deployment:** Ubuntu Server
+- **RDS Security Group (`aws_security_group.db-sg`)**:
+  - Allows inbound MySQL (port 3306) traffic from EC2 instances.
+  - Allows all outbound traffic.
 
-## 📋 Requirements
+---
 
-```bash
-python3
-python3-venv
-mysql-server
-nginx
-```
+#### **2. Application Servers**
+- **Launch Template (`aws_launch_template.rental-lt`)**:
+  - Defines the configuration for EC2 instances, including:
+    - AMI: Ubuntu 24.
+    - Instance type: `t2.micro`.
+    - Security group: `ec2-sg`.
+    - User data script for application setup and configuration.
+  - Tags the instances for easy identification.
 
-## 🚀 Setup
+- **Auto Scaling Group (`aws_autoscaling_group.app-asg`)**:
+  - Automatically scales EC2 instances based on demand.
+  - Minimum instances: 1.
+  - Maximum instances: 3.
+  - Desired capacity: 2.
+  - Associates the instances with the ALB target group.
 
-1. **Clone the repository:**
-```bash
-git clone https://github.com/ErkanBarann/car-rental-system-with-terraform.git
-cd car-rental-system-with-terraform
-```
+---
 
-2. **Set up environment variables:**
-```bash
-cp .env.example .env
-# Edit the .env file
-```
+#### **3. Load Balancer**
+- **Application Load Balancer (`aws_alb.app-lb`)**:
+  - Distributes incoming HTTP traffic across EC2 instances.
+  - Publicly accessible with an IPv4 address.
 
-3. **Create a virtual environment:**
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
+- **ALB Listener (`aws_alb_listener.app-listener`)**:
+  - Listens for HTTP traffic on port 80 and forwards it to the target group.
 
-4. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
+- **ALB Target Group (`aws_alb_target_group.app-lb-tg`)**:
+  - Defines the EC2 instances as targets for the ALB.
+  - Configures health checks to monitor instance health.
 
-5. **Create the database:**
-```bash
-mysql -u root -p
-CREATE DATABASE arac_kiralama;
-```
+---
 
-6. **Start the application:**
-```bash
-./deploy.sh
-```
+#### **4. Database**
+- **RDS Instance (`aws_db_instance.db-server`)**:
+  - MySQL 8.0 database instance.
+  - Instance type: `db.t3.micro`.
+  - Allocated storage: 20 GB.
+  - Private access only (not publicly accessible).
+  - Configured with a security group (`db-sg`) to allow traffic only from EC2 instances.
 
-## 🛠️ Terraform Integration
+- **RDS Subnet Group (`aws_db_subnet_group.default`)**:
+  - Ensures the RDS instance is deployed in private subnets.
 
-This project is fully integrated with Terraform. The `.tf` files provided in the repository allow you to set up the entire infrastructure, including EC2 instances, networking, and RDS, in a modular and automated manner. Simply follow the Terraform configuration to bring the project to life.
+---
 
-## 🔧 Deployment
+#### **5. DNS Management**
+- **Route 53 Record (`aws_route53_record.rental`)**:
+  - Creates an A record for `www.erkanbaran.me` in the Route 53 hosted zone.
+  - Points the domain to the ALB.
 
-Files required for deployment:
+---
 
-1. **Nginx Configuration:**
-```nginx
-server {
-    listen 80;
-    server_name your_domain.com;
-    
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+#### **6. GitHub Integration**
+- **GitHub Repository File (`github_repository_file.env_file`)**:
+  - Automatically uploads a [`.env`](.env ) file containing the database endpoint (`DB_HOST`) to the specified GitHub repository.
 
-2. **Gunicorn Service File:**
-```ini
-[Unit]
-Description=Gunicorn instance for car rental app
-After=network.target
+---
 
-[Service]
-User=ubuntu
-WorkingDirectory=/path/to/app
-ExecStart=/path/to/venv/bin/gunicorn --workers 4 wsgi:app
+### **How to Deploy**
 
-[Install]
-WantedBy=multi-user.target
-```
+#### **1. Prerequisites**
+- Install Terraform:
+  ```bash
+  sudo apt-get install terraform
+  ```
+- Configure AWS CLI:
+  ```bash
+  aws configure
+  ```
 
-## 📝 Usage
+#### **2. Configure Variables**
+- Update the `terraform.tfvars` file with the required values:
+  ```hcl
+  key-name = "your-key-name"
+  hosted-zone = "erkanbaran.me"
+  git-user = "your-github-username"
+  repo-name = "car-rental-system-with-terraform"
+  dbname = "araba_kiralama"
+  dbuser = "admin"
+  dbsifre = "your-db-password"
+  app-name = "araba_kiralama"
+  domain-name = "erkanbaran.me"
+  ```
 
-1. `/register` - New user registration
-2. `/login` - User login
-3. `/search` - Vehicle search
-4. `/profile` - Profile editing
-5. `/statistics` - Admin statistics
+#### **3. Initialize and Apply Terraform**
+- Initialize Terraform:
+  ```bash
+  terraform init
+  ```
+- Plan and apply the infrastructure:
+  ```bash
+  terraform plan
+  terraform apply
+  ```
 
-## 👥 Roles
+#### **4. Verify Deployment**
+- Access the application at `www.erkanbaran.me` to verify that the infrastructure and application are working correctly.
 
-- **Regular User:**
-  - Search and view vehicles
-  - Make rentals
-  - Edit profile
+---
 
-- **Admin:**
-  - All user permissions
-  - View statistics
-  - Manage vehicles and users
+### **Project Structure**
 
-## 🔒 Security
+- **`main.tf`**: Defines all AWS resources, including security groups, EC2 instances, ALB, RDS, and Route 53 records.
+- **`variable.tf`**: Declares variables used throughout the Terraform configuration.
+- **`terraform.tfvars`**: Assigns values to the declared variables.
+- **`userdata.sh`**: A script that configures EC2 instances, installs dependencies, and sets up the application.
+- **`nginx.template`**: A template for the Nginx configuration file.
+- **`gunicorn.service.template`**: A template for the Gunicorn systemd service file.
 
-- Password hashing
-- SQL injection protection
-- XSS protection
-- CSRF protection
-- Rate limiting
+---
 
-## 📈 Performance
+### **Notes**
+- Sensitive data such as database passwords should be managed using a secret manager (e.g., AWS Secrets Manager).
+- For production environments, consider using an S3 bucket and DynamoDB table for Terraform state management (examples are commented out in the [`terraform/main.tf`](terraform/main.tf ) file).
 
-- Nginx reverse proxy
-- Gunicorn multi-worker
-- Database indexing
-- Static file caching
+This project provides a fully automated infrastructure setup for a car rental system, ensuring scalability, reliability, and ease of management.
 
-## 🤝 Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push your branch
-5. Create a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-Thanks to everyone who contributed to this project!
-
-## 🛣️ Road Map
-
-1. **Retrieve Project Files:**
-   - Clone the batch GitHub repository containing the project files.
-   - Create your own repository and push the files to it.
-
-2. **Terraform Files:**
-   - Create `.tf` files adhering to the project architecture.
-   - Ensure a modular structure is implemented.
-
-3. **EC2 Instances:**
-   - Use Launch Templates to create EC2 instances.
-   - AMI should be Ubuntu 24.04 and created using a data source.
-   - Instance type: `t2.micro`.
-
-4. **Networking:**
-   - Use the default VPC and subnets.
-
-5. **Output:**
-   - Generate the DNS name as an output.
-
-6. **User Data:**
-   - Provide user data for the instances.
-
-7. **Variables:**
-   - Utilize variables for configuration.
-
-8. **RDS Endpoint:**
-   - Push the RDS endpoint to the project repository on GitHub using the GitHub provider.
-
-## 🌟 Infrastructure (Terraform)
-
-🎯 **Project Solution Files:** The `.tf` files provided in the repository represent the **resolved state** of the project. These files allow the project to be fully deployed and operational. 🚀
+### **Additional Note**
+The Terraform solution files for this project have been added to the `terraform` directory.
 
 
 
